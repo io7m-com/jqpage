@@ -115,11 +115,18 @@ public final class JQKeysetRandomAccessPagination
     final var orderBy = new Field<?>[sortFields.size()];
     sortFields.toArray(orderBy);
 
+    var firstOffset = 0L;
     pages.add(
-      new JQKeysetRandomAccessPageDefinition(new Object[0], orderBy, 1L, pageSize)
+      new JQKeysetRandomAccessPageDefinition(
+        new Object[0],
+        orderBy,
+        1L,
+        pageSize,
+        firstOffset)
     );
 
     for (final var record : result) {
+      firstOffset += pageSize;
       final var values = new Object[sortFields.size()];
       for (int index = 0; index < values.length; ++index) {
         values[index] = record.get(sortFields.get(index));
@@ -129,7 +136,8 @@ public final class JQKeysetRandomAccessPagination
           values,
           orderBy,
           record.<Long>getValue("jq_page_number", Long.class).longValue(),
-          pageSize
+          pageSize,
+          firstOffset
         )
       );
     }

@@ -26,17 +26,20 @@ import java.util.Objects;
  * record that can be used to seek to the start of the given page. For the first
  * page, seek is the empty array (and so no seeking should be performed).
  *
- * @param seek    The record to which to seek to reach the start of this page
- * @param orderBy The fields by which to order records
- * @param index   The page number
- * @param limit   The maximum possible number of items in the page
+ * @param seek        The record to which to seek to reach the start of this
+ *                    page
+ * @param orderBy     The fields by which to order records
+ * @param index       The page number
+ * @param limit       The maximum possible number of items in the page
+ * @param firstOffset The offset of the first item
  */
 
 public record JQKeysetRandomAccessPageDefinition(
   Object[] seek,
   Field<?>[] orderBy,
   long index,
-  long limit)
+  long limit,
+  long firstOffset)
 {
   /**
    * A page produced by keyset pagination. The {@link #seek} field specifies a
@@ -44,10 +47,12 @@ public record JQKeysetRandomAccessPageDefinition(
    * first page, seek is the empty array (and so no seeking should be
    * performed).
    *
-   * @param seek    The record to which to seek to reach the start of this page
-   * @param orderBy The fields by which to order records
-   * @param index   The page number
-   * @param limit   The maximum possible number of items in the page
+   * @param seek        The record to which to seek to reach the start of this
+   *                    page
+   * @param orderBy     The fields by which to order records
+   * @param index       The page number
+   * @param limit       The maximum possible number of items in the page
+   * @param firstOffset The offset of the first item
    */
 
   public JQKeysetRandomAccessPageDefinition
