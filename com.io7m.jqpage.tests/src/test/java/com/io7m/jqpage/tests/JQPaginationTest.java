@@ -16,6 +16,7 @@
 
 package com.io7m.jqpage.tests;
 
+import com.io7m.jqpage.core.JQKeysetRandomAccessPageDefinition;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPagination;
 import com.io7m.jqpage.core.JQOffsetPagination;
 import org.jooq.Field;
@@ -221,12 +222,7 @@ public final class JQPaginationTest
       final var context =
         createContext(connection);
 
-      final var fields = new Field[]{
-        CUSTOMER.FIRST_NAME,
-        CUSTOMER.LAST_NAME
-      };
-
-      final var pages =
+      final List<JQKeysetRandomAccessPageDefinition> pages =
         JQKeysetRandomAccessPagination.createPageDefinitions(
           context,
           CUSTOMER.where(CUSTOMER.FIRST_NAME.like("%%I%%")),
@@ -243,7 +239,7 @@ public final class JQPaginationTest
 
       {
         final var page = pages.get(1);
-        final var records =
+        final List<Person> records =
           context.selectFrom(CUSTOMER)
             .where(CUSTOMER.FIRST_NAME.like("%%I%%"))
             .orderBy(page.orderBy())
