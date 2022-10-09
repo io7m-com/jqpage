@@ -14,7 +14,7 @@ database.
 
 Offset pagination is provided by the `JQOffsetPagination` class. Offset
 pagination is generally considered inferior to 
-[keyset pagination](#keyset_pagination) but may be necessary when executing
+[keyset pagination](#keyset-pagination) but may be necessary when executing
 queries that are too complex to use keyset pagination. The `JQOffsetPagination`
 class implements pagination in a single database round trip by calculating
 page boundary offsets using window functions. See
