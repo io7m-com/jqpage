@@ -29,7 +29,7 @@ import java.util.Objects;
  * @param seek        The record to which to seek to reach the start of this
  *                    page
  * @param orderBy     The fields by which to order records
- * @param index       The page number
+ * @param index       The page number (starting at 1)
  * @param limit       The maximum possible number of items in the page
  * @param firstOffset The offset of the first item
  */
@@ -50,7 +50,7 @@ public record JQKeysetRandomAccessPageDefinition(
    * @param seek        The record to which to seek to reach the start of this
    *                    page
    * @param orderBy     The fields by which to order records
-   * @param index       The page number
+   * @param index       The page number (starting at 1)
    * @param limit       The maximum possible number of items in the page
    * @param firstOffset The offset of the first item
    */
