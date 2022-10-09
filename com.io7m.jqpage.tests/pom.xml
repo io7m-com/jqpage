@@ -66,10 +66,6 @@
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.github.jsqlparser</groupId>
-      <artifactId>jsqlparser</artifactId>
-    </dependency>
 
     <dependency>
       <groupId>org.osgi</groupId>
