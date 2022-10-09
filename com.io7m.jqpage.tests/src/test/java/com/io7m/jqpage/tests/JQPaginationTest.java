@@ -22,6 +22,7 @@ import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
@@ -29,6 +30,7 @@ import static com.io7m.jqpage.tests.tables.Actor.ACTOR;
 import static com.io7m.jqpage.tests.tables.Customer.CUSTOMER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+@Testcontainers(disabledWithoutDocker = true)
 public final class JQPaginationTest
   extends JQWithDatabaseContract
 {
