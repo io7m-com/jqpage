@@ -13,7 +13,7 @@
              - ? matches a single character in a directory / file name -->
         <property>
           <key>scripts</key>
-          <value>src/test/resources/postgres-sakila-schema.sql</value>
+          <value>src/main/resources/com/io7m/jqpage/tests/postgres-sakila-schema.sql</value>
         </property>
 
         <!-- The sort order of the scripts within a directory, where:

@@ -30,6 +30,8 @@ import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.junit.jupiter.Container;
 
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -51,6 +53,7 @@ public abstract class JQWithDatabaseContract
       .withUsername("postgres")
       .withPassword("12345678");
 
+  private static Path DIRECTORY;
   private static PGSimpleDataSource SOURCE;
 
   @BeforeAll
@@ -60,9 +63,10 @@ public abstract class JQWithDatabaseContract
     LOG.debug("serverSetup");
     waitForDatabaseToStart();
     SOURCE = createPool();
+    DIRECTORY = JQTestDirectories.createTempDirectory();
 
-    copyToContainer("/postgres-sakila-schema.sql");
-    copyToContainer("/postgres-sakila-insert-data.sql");
+    copyToContainer("postgres-sakila-schema.sql");
+    copyToContainer("postgres-sakila-insert-data.sql");
     POSTGRESQL.addEnv("PGPASSWORD", "12345678");
 
     {
@@ -100,11 +104,17 @@ public abstract class JQWithDatabaseContract
     final String name)
     throws IOException
   {
-    final var c = JQWithDatabaseContract.class;
-    try (var s = c.getResourceAsStream(name)) {
-      final var data = s.readAllBytes();
-      POSTGRESQL.copyFileToContainer(Transferable.of(data), name);
-    }
+    final var data =
+      JQTestDirectories.resourceBytesOf(
+        JQWithDatabaseContract.class,
+        DIRECTORY,
+        name
+      );
+
+    POSTGRESQL.copyFileToContainer(
+      Transferable.of(data),
+      "/%s".formatted(name)
+    );
   }
 
   private static PGSimpleDataSource createPool()
@@ -135,6 +145,7 @@ public abstract class JQWithDatabaseContract
     throws Exception
   {
     LOG.debug("serverTearDown");
+    JQTestDirectories.deleteDirectory(DIRECTORY);
   }
 
   private static void waitForDatabaseToStart()
