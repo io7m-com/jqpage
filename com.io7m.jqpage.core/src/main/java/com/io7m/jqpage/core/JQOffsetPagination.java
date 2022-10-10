@@ -20,11 +20,13 @@ import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Select;
+import org.jooq.Statement;
 import org.jooq.impl.DSL;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -74,20 +76,25 @@ public final class JQOffsetPagination
       sortArray,
       limit,
       offset,
-      fromRecord
+      fromRecord,
+      statement -> {
+
+      }
     );
   }
 
   /**
    * Paginate a query using offset pagination.
    *
-   * @param context    The DSL context
-   * @param query      The base query
-   * @param sort       The fields by which the query is to be sorted
-   * @param limit      The limit (page size)
-   * @param offset     The starting offset
-   * @param fromRecord A function that converts records to values
-   * @param <T>        The type of returned values
+   * @param context           The DSL context
+   * @param query             The base query
+   * @param sort              The fields by which the query is to be sorted
+   * @param limit             The limit (page size)
+   * @param offset            The starting offset
+   * @param fromRecord        A function that converts records to values
+   * @param <T>               The type of returned values
+   * @param statementListener A listener that will receive the statement to be
+   *                          executed
    *
    * @return A page of results
    */
@@ -98,15 +105,19 @@ public final class JQOffsetPagination
     final Field<?>[] sort,
     final long limit,
     final long offset,
-    final Function<Record, T> fromRecord)
+    final Function<Record, T> fromRecord,
+    final Consumer<Statement> statementListener)
   {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(query, "query");
     Objects.requireNonNull(sort, "sort");
     Objects.requireNonNull(fromRecord, "fromRecord");
+    Objects.requireNonNull(statementListener, "statementListener");
 
     final var pageQuery =
       paginateInner(context, query, sort, limit, offset);
+
+    statementListener.accept(pageQuery);
 
     final var results =
       pageQuery.fetch();

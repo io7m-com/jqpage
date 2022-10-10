@@ -18,12 +18,14 @@ package com.io7m.jqpage.core;
 
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.Statement;
 import org.jooq.TableLike;
 import org.jooq.impl.DSL;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Pagination functions using keyset pagination.
@@ -53,9 +55,41 @@ public final class JQKeysetRandomAccessPagination
     final List<Field<?>> sortFields,
     final long pageSize)
   {
+    return createPageDefinitions(
+      context,
+      table,
+      sortFields,
+      pageSize,
+      statement -> {
+
+      }
+    );
+  }
+
+  /**
+   * Create a set of pages for the given query.
+   *
+   * @param context           The SQL context
+   * @param table             The table-like query
+   * @param sortFields        The ORDER BY fields
+   * @param pageSize          The page size
+   * @param statementListener A listener that will receive the statement to be
+   *                          executed
+   *
+   * @return A set of pages
+   */
+
+  public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
+    final DSLContext context,
+    final TableLike<?> table,
+    final List<Field<?>> sortFields,
+    final long pageSize,
+    final Consumer<Statement> statementListener)
+  {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(table, "table");
     Objects.requireNonNull(sortFields, "fields");
+    Objects.requireNonNull(statementListener, "statementListener");
 
     /*
      * An object is on a page boundary if the row number is exactly
@@ -109,6 +143,9 @@ public final class JQKeysetRandomAccessPagination
 
     final var pages =
       new ArrayList<JQKeysetRandomAccessPageDefinition>();
+
+    statementListener.accept(outerPageBoundaries);
+
     final var result =
       outerPageBoundaries.fetch();
 
