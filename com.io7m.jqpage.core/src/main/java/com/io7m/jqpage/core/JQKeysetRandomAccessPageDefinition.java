@@ -17,7 +17,7 @@
 
 package com.io7m.jqpage.core;
 
-import org.jooq.Field;
+import org.jooq.SortField;
 
 import java.util.Objects;
 
@@ -36,7 +36,7 @@ import java.util.Objects;
 
 public record JQKeysetRandomAccessPageDefinition(
   Object[] seek,
-  Field<?>[] orderBy,
+  SortField<?>[] orderBy,
   long index,
   long limit,
   long firstOffset)

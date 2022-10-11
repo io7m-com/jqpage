@@ -16,17 +16,22 @@
 
 package com.io7m.jqpage.tests;
 
+import com.io7m.jqpage.core.JQField;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPageDefinition;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPagination;
 import com.io7m.jqpage.core.JQOffsetPagination;
-import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static com.io7m.jqpage.core.JQOrder.ASCENDING;
+import static com.io7m.jqpage.core.JQOrder.DESCENDING;
 import static com.io7m.jqpage.tests.tables.Actor.ACTOR;
 import static com.io7m.jqpage.tests.tables.Customer.CUSTOMER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +40,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public final class JQPaginationTest
   extends JQWithDatabaseContract
 {
+  private ArrayList<String> statements;
+
+  @BeforeEach
+  public void setup()
+  {
+    this.statements = new ArrayList<String>();
+  }
+
+  @AfterEach
+  public void tearDown()
+  {
+    for (final var st : this.statements) {
+      System.out.println(st);
+      System.out.println();
+    }
+  }
+
   /**
    * Select all actors.
    *
@@ -123,7 +145,7 @@ public final class JQPaginationTest
           JQOffsetPagination.paginate(
             context,
             baseQuery,
-            List.of(ACTOR.ACTOR_ID),
+            List.of(new JQField(ACTOR.ACTOR_ID, ASCENDING)),
             75L,
             0L,
             JQPaginationTest::toActor
@@ -140,10 +162,11 @@ public final class JQPaginationTest
           JQOffsetPagination.paginate(
             context,
             baseQuery,
-            List.of(ACTOR.ACTOR_ID),
+            List.of(new JQField(ACTOR.ACTOR_ID, ASCENDING)),
             75L,
             75L,
-            JQPaginationTest::toActor
+            JQPaginationTest::toActor,
+            statement -> this.statements.add(statement.toString())
           );
 
         assertEquals(76L, page.pageFirstOffset());
@@ -157,7 +180,7 @@ public final class JQPaginationTest
           JQOffsetPagination.paginate(
             context,
             baseQuery,
-            List.of(ACTOR.ACTOR_ID),
+            List.of(new JQField(ACTOR.ACTOR_ID, ASCENDING)),
             75L,
             150L,
             JQPaginationTest::toActor
@@ -194,7 +217,7 @@ public final class JQPaginationTest
           JQOffsetPagination.paginate(
             context,
             baseQuery,
-            List.of(ACTOR.ACTOR_ID),
+            List.of(new JQField(ACTOR.ACTOR_ID, ASCENDING)),
             75L,
             0L,
             JQPaginationTest::toActor
@@ -226,8 +249,12 @@ public final class JQPaginationTest
         JQKeysetRandomAccessPagination.createPageDefinitions(
           context,
           CUSTOMER.where(CUSTOMER.FIRST_NAME.like("%%I%%")),
-          List.of(CUSTOMER.FIRST_NAME, CUSTOMER.LAST_NAME),
-          75L
+          List.of(
+            new JQField(CUSTOMER.FIRST_NAME, ASCENDING),
+            new JQField(CUSTOMER.LAST_NAME, ASCENDING)
+          ),
+          75L,
+          statement -> this.statements.add(statement.toString())
         );
 
       assertEquals(4, pages.size());
@@ -249,20 +276,32 @@ public final class JQPaginationTest
             .map(JQPaginationTest::toCustomer);
         assertEquals(2L, page.index());
         assertEquals(75, records.size());
+        assertEquals("FREDDIE", records.get(0).nameFirst);
+        assertEquals("DUGGAN", records.get(0).nameLast);
+        assertEquals("FREDERICK", records.get(1).nameFirst);
+        assertEquals("ISBELL", records.get(1).nameLast);
       }
 
       {
         final var page = pages.get(2);
-        final var records =
+        final var statement =
           context.selectFrom(CUSTOMER)
             .where(CUSTOMER.FIRST_NAME.like("%%I%%"))
             .orderBy(page.orderBy())
             .seek(page.seek())
-            .limit(page.limit())
-            .fetch()
+            .limit(page.limit());
+
+        this.statements.add(statement.toString());
+
+        final var records =
+          statement.fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(3L, page.index());
         assertEquals(75, records.size());
+        assertEquals("MARIO", records.get(0).nameFirst);
+        assertEquals("CHEATHAM", records.get(0).nameLast);
+        assertEquals("MARION", records.get(1).nameFirst);
+        assertEquals("OCAMPO", records.get(1).nameLast);
       }
 
       {
@@ -277,6 +316,280 @@ public final class JQPaginationTest
             .map(JQPaginationTest::toCustomer);
         assertEquals(4L, page.index());
         assertEquals(8, records.size());
+        assertEquals("VIRGIL", records.get(0).nameFirst);
+        assertEquals("WOFFORD", records.get(0).nameLast);
+        assertEquals("VIRGINIA", records.get(1).nameFirst);
+        assertEquals("GREEN", records.get(1).nameLast);
+      }
+    }
+  }
+
+  /**
+   * Select actors using keyset pagination.
+   *
+   * @throws Exception On errors
+   */
+
+  @Test
+  public void testActorKeysetPaginationDescending()
+    throws Exception
+  {
+    try (var connection = openConnection()) {
+      final var context =
+        createContext(connection);
+
+      final List<JQKeysetRandomAccessPageDefinition> pages =
+        JQKeysetRandomAccessPagination.createPageDefinitions(
+          context,
+          CUSTOMER.where(CUSTOMER.FIRST_NAME.like("%%I%%")),
+          List.of(
+            new JQField(CUSTOMER.FIRST_NAME, DESCENDING),
+            new JQField(CUSTOMER.LAST_NAME, DESCENDING)
+          ),
+          75L
+        );
+
+      assertEquals(4, pages.size());
+
+      {
+        final var page = pages.get(0);
+        assertEquals(1L, page.index());
+
+        final List<Person> records =
+          context.selectFrom(CUSTOMER)
+            .where(CUSTOMER.FIRST_NAME.like("%I%"))
+            .orderBy(page.orderBy())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+
+        assertEquals("WILMA", records.get(0).nameFirst);
+        assertEquals("RICHARDS", records.get(0).nameLast);
+        assertEquals("WILLIE", records.get(1).nameFirst);
+        assertEquals("MARKHAM", records.get(1).nameLast);
+      }
+
+      {
+        final var page = pages.get(1);
+        final List<Person> records =
+          context.selectFrom(CUSTOMER)
+            .where(CUSTOMER.FIRST_NAME.like("%I%"))
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(2L, page.index());
+        assertEquals(75, records.size());
+
+        assertEquals("MAURICE", records.get(0).nameFirst);
+        assertEquals("CRAWLEY", records.get(0).nameLast);
+        assertEquals("MATTIE", records.get(1).nameFirst);
+        assertEquals("HOFFMAN", records.get(1).nameLast);
+      }
+
+      {
+        final var page = pages.get(2);
+        final var statement =
+          context.selectFrom(CUSTOMER)
+            .where(CUSTOMER.FIRST_NAME.like("%I%"))
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit());
+
+        this.statements.add(statement.toString());
+
+        final var records =
+          statement.fetch()
+            .map(JQPaginationTest::toCustomer);
+
+        assertEquals(3L, page.index());
+        assertEquals(75, records.size());
+
+        assertEquals("GINA", records.get(0).nameFirst);
+        assertEquals("WILLIAMSON", records.get(0).nameLast);
+        assertEquals("GILBERT", records.get(1).nameFirst);
+        assertEquals("SLEDGE", records.get(1).nameLast);
+      }
+
+      {
+        final var page = pages.get(3);
+        final var records =
+          context.selectFrom(CUSTOMER)
+            .where(CUSTOMER.FIRST_NAME.like("%%I%%"))
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+
+        assertEquals(4L, page.index());
+        assertEquals(8, records.size());
+
+        assertEquals("ANTONIO", records.get(0).nameFirst);
+        assertEquals("MEEK", records.get(0).nameLast);
+        assertEquals("ANNIE", records.get(1).nameFirst);
+        assertEquals("RUSSELL", records.get(1).nameLast);
+      }
+    }
+  }
+
+  /**
+   * Select actors using keyset pagination.
+   *
+   * @throws Exception On errors
+   */
+
+  @Test
+  public void testActorKeysetPaginationDescendingID()
+    throws Exception
+  {
+    try (var connection = openConnection()) {
+      final var context =
+        createContext(connection);
+
+      final List<JQKeysetRandomAccessPageDefinition> pages =
+        JQKeysetRandomAccessPagination.createPageDefinitions(
+          context,
+          CUSTOMER,
+          List.of(
+            new JQField(CUSTOMER.CUSTOMER_ID, DESCENDING)
+          ),
+          75L
+        );
+
+      assertEquals(8, pages.size());
+
+      {
+        final var page = pages.get(0);
+        assertEquals(1L, page.index());
+
+        final List<Person> records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+
+        assertEquals(599, records.get(0).id);
+        assertEquals(598, records.get(1).id);
+        assertEquals(525, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(1);
+        final List<Person> records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(2L, page.index());
+        assertEquals(75, records.size());
+        assertEquals(524, records.get(0).id);
+        assertEquals(523, records.get(1).id);
+        assertEquals(450, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(2);
+        final var statement =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit());
+
+        this.statements.add(statement.toString());
+
+        final var records =
+          statement.fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(3L, page.index());
+        assertEquals(75, records.size());
+        assertEquals(449, records.get(0).id);
+        assertEquals(448, records.get(1).id);
+        assertEquals(375, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(3);
+        final var records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(4L, page.index());
+        assertEquals(75, records.size());
+        assertEquals(374, records.get(0).id);
+        assertEquals(373, records.get(1).id);
+        assertEquals(300, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(4);
+        final var records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(5L, page.index());
+        assertEquals(75, records.size());
+        assertEquals(299, records.get(0).id);
+        assertEquals(298, records.get(1).id);
+        assertEquals(225, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(5);
+        final var records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(6L, page.index());
+        assertEquals(75, records.size());
+        assertEquals(224, records.get(0).id);
+        assertEquals(223, records.get(1).id);
+        assertEquals(150, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(6);
+        final var records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(7L, page.index());
+        assertEquals(75, records.size());
+        assertEquals(149, records.get(0).id);
+        assertEquals(148, records.get(1).id);
+        assertEquals(75, records.get(74).id);
+      }
+
+      {
+        final var page = pages.get(7);
+        final var records =
+          context.selectFrom(CUSTOMER)
+            .orderBy(page.orderBy())
+            .seek(page.seek())
+            .limit(page.limit())
+            .fetch()
+            .map(JQPaginationTest::toCustomer);
+        assertEquals(8L, page.index());
+        assertEquals(74, records.size());
+        assertEquals(74, records.get(0).id);
+        assertEquals(73, records.get(1).id);
+        assertEquals(1, records.get(73).id);
       }
     }
   }

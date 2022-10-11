@@ -18,6 +18,7 @@ package com.io7m.jqpage.core;
 
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.SortField;
 import org.jooq.Statement;
 import org.jooq.TableLike;
 import org.jooq.impl.DSL;
@@ -52,7 +53,7 @@ public final class JQKeysetRandomAccessPagination
   public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
     final DSLContext context,
     final TableLike<?> table,
-    final List<Field<?>> sortFields,
+    final List<JQField> sortFields,
     final long pageSize)
   {
     return createPageDefinitions(
@@ -82,7 +83,7 @@ public final class JQKeysetRandomAccessPagination
   public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
     final DSLContext context,
     final TableLike<?> table,
-    final List<Field<?>> sortFields,
+    final List<JQField> sortFields,
     final long pageSize,
     final Consumer<Statement> statementListener)
   {
@@ -97,9 +98,19 @@ public final class JQKeysetRandomAccessPagination
      * database side with a window function.
      */
 
+    final var fieldsForOrderBy = new SortField[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForOrderBy[index] = sortFields.get(index).fieldOrdered();
+    }
+
+    final var fieldsForSelect = new Field[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForSelect[index] = sortFields.get(index).field();
+    }
+
     final var pageBoundaryExpression =
       DSL.rowNumber()
-        .over(DSL.orderBy(sortFields))
+        .over(DSL.orderBy(fieldsForOrderBy))
         .modulo(DSL.inline(pageSize));
 
     final var casePageBoundary =
@@ -108,18 +119,28 @@ public final class JQKeysetRandomAccessPagination
         .else_(DSL.inline(false))
         .as("jq_is_page_boundary");
 
-    final var innerSelects = new ArrayList<>(sortFields);
+    final var innerSelects = new ArrayList<Field<?>>();
+    for (final var f : fieldsForSelect) {
+      innerSelects.add(f);
+    }
     innerSelects.add(casePageBoundary);
 
     final var innerPageBoundaries =
       context.select(innerSelects)
         .from(table)
-        .orderBy(sortFields)
+        .orderBy(fieldsForOrderBy)
         .asTable("jq_inner");
 
-    final ArrayList<Field<?>> innerFields = new ArrayList<>();
-    for (final var field : sortFields) {
-      innerFields.add(innerPageBoundaries.field(field));
+    final var fieldsForOrderByInner = new SortField[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForOrderByInner[index] =
+        sortFields.get(index).fieldQualifiedSort(innerPageBoundaries);
+    }
+
+    final var fieldsForSelectInner = new Field[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForSelectInner[index] =
+        sortFields.get(index).fieldQualified(innerPageBoundaries);
     }
 
     /*
@@ -129,11 +150,14 @@ public final class JQKeysetRandomAccessPagination
 
     final var pageNumberExpression =
       DSL.rowNumber()
-        .over(DSL.orderBy(innerFields))
+        .over(DSL.orderBy(fieldsForOrderByInner))
         .plus(DSL.inline(1))
         .as("jq_page_number");
 
-    final ArrayList<Field<?>> outerSelects = new ArrayList<>(innerFields);
+    final ArrayList<Field<?>> outerSelects = new ArrayList<>();
+    for (final var f : fieldsForSelectInner) {
+      outerSelects.add(f);
+    }
     outerSelects.add(pageNumberExpression);
 
     final var outerPageBoundaries =
@@ -149,14 +173,11 @@ public final class JQKeysetRandomAccessPagination
     final var result =
       outerPageBoundaries.fetch();
 
-    final var orderBy = new Field<?>[sortFields.size()];
-    sortFields.toArray(orderBy);
-
     var firstOffset = 0L;
     pages.add(
       new JQKeysetRandomAccessPageDefinition(
         new Object[0],
-        orderBy,
+        fieldsForOrderBy,
         1L,
         pageSize,
         firstOffset)
@@ -164,14 +185,14 @@ public final class JQKeysetRandomAccessPagination
 
     for (final var record : result) {
       firstOffset += pageSize;
-      final var values = new Object[sortFields.size()];
+      final var values = new Object[fieldsForOrderBy.length];
       for (int index = 0; index < values.length; ++index) {
-        values[index] = record.get(sortFields.get(index));
+        values[index] = record.get(fieldsForSelect[index]);
       }
       pages.add(
         new JQKeysetRandomAccessPageDefinition(
           values,
-          orderBy,
+          fieldsForOrderBy,
           record.<Long>getValue("jq_page_number", Long.class).longValue(),
           pageSize,
           firstOffset
