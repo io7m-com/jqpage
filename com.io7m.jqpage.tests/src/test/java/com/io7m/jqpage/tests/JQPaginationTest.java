@@ -20,6 +20,7 @@ import com.io7m.jqpage.core.JQField;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPageDefinition;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPagination;
 import com.io7m.jqpage.core.JQOffsetPagination;
+import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +33,8 @@ import java.util.List;
 
 import static com.io7m.jqpage.core.JQOrder.ASCENDING;
 import static com.io7m.jqpage.core.JQOrder.DESCENDING;
+import static com.io7m.jqpage.tests.Tables.FILM;
+import static com.io7m.jqpage.tests.Tables.FILM_ACTOR;
 import static com.io7m.jqpage.tests.tables.Actor.ACTOR;
 import static com.io7m.jqpage.tests.tables.Customer.CUSTOMER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -248,11 +251,15 @@ public final class JQPaginationTest
       final List<JQKeysetRandomAccessPageDefinition> pages =
         JQKeysetRandomAccessPagination.createPageDefinitions(
           context,
-          CUSTOMER.where(CUSTOMER.FIRST_NAME.like("%%I%%")),
+          CUSTOMER,
           List.of(
             new JQField(CUSTOMER.FIRST_NAME, ASCENDING),
             new JQField(CUSTOMER.LAST_NAME, ASCENDING)
           ),
+          List.of(
+            CUSTOMER.FIRST_NAME.like("%%I%%")
+          ),
+          List.of(),
           75L,
           statement -> this.statements.add(statement.toString())
         );
@@ -341,11 +348,15 @@ public final class JQPaginationTest
       final List<JQKeysetRandomAccessPageDefinition> pages =
         JQKeysetRandomAccessPagination.createPageDefinitions(
           context,
-          CUSTOMER.where(CUSTOMER.FIRST_NAME.like("%%I%%")),
+          CUSTOMER,
           List.of(
             new JQField(CUSTOMER.FIRST_NAME, DESCENDING),
             new JQField(CUSTOMER.LAST_NAME, DESCENDING)
           ),
+          List.of(
+            CUSTOMER.FIRST_NAME.like("%%I%%")
+          ),
+          List.of(),
           75L
         );
 
@@ -356,10 +367,7 @@ public final class JQPaginationTest
         assertEquals(1L, page.index());
 
         final List<Person> records =
-          context.selectFrom(CUSTOMER)
-            .where(CUSTOMER.FIRST_NAME.like("%I%"))
-            .orderBy(page.orderBy())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
 
@@ -372,11 +380,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(1);
         final List<Person> records =
-          context.selectFrom(CUSTOMER)
-            .where(CUSTOMER.FIRST_NAME.like("%I%"))
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(2L, page.index());
@@ -390,12 +394,7 @@ public final class JQPaginationTest
 
       {
         final var page = pages.get(2);
-        final var statement =
-          context.selectFrom(CUSTOMER)
-            .where(CUSTOMER.FIRST_NAME.like("%I%"))
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit());
+        final var statement = page.query(context);
 
         this.statements.add(statement.toString());
 
@@ -414,12 +413,8 @@ public final class JQPaginationTest
 
       {
         final var page = pages.get(3);
-        final var records =
-          context.selectFrom(CUSTOMER)
-            .where(CUSTOMER.FIRST_NAME.like("%%I%%"))
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+        final List<Person> records =
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
 
@@ -455,6 +450,8 @@ public final class JQPaginationTest
           List.of(
             new JQField(CUSTOMER.CUSTOMER_ID, DESCENDING)
           ),
+          List.of(),
+          List.of(),
           75L
         );
 
@@ -465,9 +462,7 @@ public final class JQPaginationTest
         assertEquals(1L, page.index());
 
         final List<Person> records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
 
@@ -479,10 +474,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(1);
         final List<Person> records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(2L, page.index());
@@ -495,10 +487,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(2);
         final var statement =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit());
+          page.query(context);
 
         this.statements.add(statement.toString());
 
@@ -515,10 +504,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(3);
         final var records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(4L, page.index());
@@ -531,10 +517,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(4);
         final var records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(5L, page.index());
@@ -547,10 +530,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(5);
         final var records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(6L, page.index());
@@ -563,10 +543,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(6);
         final var records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(7L, page.index());
@@ -579,10 +556,7 @@ public final class JQPaginationTest
       {
         final var page = pages.get(7);
         final var records =
-          context.selectFrom(CUSTOMER)
-            .orderBy(page.orderBy())
-            .seek(page.seek())
-            .limit(page.limit())
+          page.query(context)
             .fetch()
             .map(JQPaginationTest::toCustomer);
         assertEquals(8L, page.index());
@@ -590,6 +564,53 @@ public final class JQPaginationTest
         assertEquals(74, records.get(0).id);
         assertEquals(73, records.get(1).id);
         assertEquals(1, records.get(73).id);
+      }
+    }
+  }
+
+  /**
+   * Select actors using keyset pagination with grouping.
+   *
+   * @throws Exception On errors
+   */
+
+  @Test
+  public void testActorKeysetPaginationGrouping()
+    throws Exception
+  {
+    try (var connection = openConnection()) {
+      final var context =
+        createContext(connection);
+
+      final var baseTable =
+        ACTOR
+          .join(FILM_ACTOR).on(FILM_ACTOR.ACTOR_ID.eq(ACTOR.ACTOR_ID))
+          .join(FILM).on(FILM.FILM_ID.eq(FILM_ACTOR.FILM_ID));
+
+      final List<JQKeysetRandomAccessPageDefinition> pages =
+        JQKeysetRandomAccessPagination.createPageDefinitions(
+          context,
+          baseTable,
+          List.of(new JQField(ACTOR.ACTOR_ID, ASCENDING)),
+          List.of(FILM.TITLE.equalIgnoreCase("MIRACLE VIRTUAL")),
+          List.of(ACTOR.ACTOR_ID, FILM.FILM_ID),
+          75L
+        );
+
+      assertEquals(1, pages.size());
+
+      {
+        final var page = pages.get(0);
+        assertEquals(1L, page.index());
+
+        final List<Person> records =
+          page.queryFields(context, List.of(ACTOR.ACTOR_ID, ACTOR.FIRST_NAME, ACTOR.LAST_NAME, FILM.TITLE))
+            .fetch()
+            .map(JQPaginationTest::toActor);
+
+        assertEquals(1, records.size());
+        assertEquals("FRED", records.get(0).nameFirst);
+        assertEquals("COSTNER", records.get(0).nameLast);
       }
     }
   }

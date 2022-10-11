@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<configuration xmlns="http://ch.qos.logback/xml/ns/logback"
+               debug="false">
+
+  <appender
+    name="STDERR"
+    class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%logger{128}: %level: %msg%n</pattern>
+    </encoder>
+    <target>System.err</target>
+  </appender>
+
+  <logger name="com.github.dockerjava"
+          level="ERROR"/>
+
+  <root level="TRACE">
+    <appender-ref ref="STDERR"/>
+  </root>
+
+</configuration>

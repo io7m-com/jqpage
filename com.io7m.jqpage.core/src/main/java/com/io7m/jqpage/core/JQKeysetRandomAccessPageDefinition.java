@@ -17,8 +17,19 @@
 
 package com.io7m.jqpage.core;
 
+import org.jooq.Condition;
+import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.GroupField;
+import org.jooq.Record;
+import org.jooq.Select;
+import org.jooq.SelectConditionStep;
+import org.jooq.SelectSeekStepN;
+import org.jooq.SelectSelectStep;
 import org.jooq.SortField;
+import org.jooq.TableLike;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -26,9 +37,12 @@ import java.util.Objects;
  * record that can be used to seek to the start of the given page. For the first
  * page, seek is the empty array (and so no seeking should be performed).
  *
+ * @param table       The base table-like object
  * @param seek        The record to which to seek to reach the start of this
  *                    page
  * @param orderBy     The fields by which to order records
+ * @param groupBy     The fields by which to group results
+ * @param conditions  The conditions by which to filter rows
  * @param index       The page number (starting at 1)
  * @param limit       The maximum possible number of items in the page
  * @param firstOffset The offset of the first item
@@ -36,7 +50,10 @@ import java.util.Objects;
 
 public record JQKeysetRandomAccessPageDefinition(
   Object[] seek,
+  TableLike<?> table,
   SortField<?>[] orderBy,
+  List<Condition> conditions,
+  List<GroupField> groupBy,
   long index,
   long limit,
   long firstOffset)
@@ -47,9 +64,12 @@ public record JQKeysetRandomAccessPageDefinition(
    * first page, seek is the empty array (and so no seeking should be
    * performed).
    *
+   * @param table       The base table-like object
    * @param seek        The record to which to seek to reach the start of this
    *                    page
    * @param orderBy     The fields by which to order records
+   * @param groupBy     The fields by which to group results
+   * @param conditions  The conditions by which to filter rows
    * @param index       The page number (starting at 1)
    * @param limit       The maximum possible number of items in the page
    * @param firstOffset The offset of the first item
@@ -59,5 +79,59 @@ public record JQKeysetRandomAccessPageDefinition(
   {
     Objects.requireNonNull(seek, "seek");
     Objects.requireNonNull(orderBy, "orderBy");
+  }
+
+  /**
+   * @param context The DSL context
+   *
+   * @return A query that selects all fields
+   */
+
+  public Select<?> query(
+    final DSLContext context)
+  {
+    return this.queryFields(context, List.of());
+  }
+
+  /**
+   * @param fields  The fields to use in the SELECT clause
+   * @param context The DSL context
+   *
+   * @return A query that selects the given fields
+   */
+
+  public Select<?> queryFields(
+    final DSLContext context,
+    final List<Field<?>> fields)
+  {
+    final SelectSelectStep<Record> baseStart;
+    if (fields.isEmpty()) {
+      baseStart = context.select();
+    } else {
+      baseStart = context.select(fields);
+    }
+
+    final SelectConditionStep<?> baseSelect =
+      baseStart.from(this.table)
+        .where(this.conditions);
+
+    final SelectSeekStepN<?> baseOrderedSelect;
+    if (!this.groupBy.isEmpty()) {
+      baseOrderedSelect =
+        baseSelect.groupBy(this.groupBy)
+          .orderBy(this.orderBy);
+    } else {
+      baseOrderedSelect =
+        baseSelect.orderBy(this.orderBy);
+    }
+
+    if (this.seek.length > 0) {
+      return baseOrderedSelect
+        .seek(this.seek)
+        .limit(Long.valueOf(this.limit));
+    } else {
+      return baseOrderedSelect
+        .limit(Long.valueOf(this.limit));
+    }
   }
 }
