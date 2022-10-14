@@ -20,6 +20,7 @@ import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Select;
+import org.jooq.SortField;
 import org.jooq.Statement;
 import org.jooq.impl.DSL;
 
@@ -57,7 +58,7 @@ public final class JQOffsetPagination
   public static <T> JQPage<T> paginate(
     final DSLContext context,
     final Select<?> query,
-    final List<Field<?>> sort,
+    final List<JQField> sort,
     final long limit,
     final long offset,
     final Function<Record, T> fromRecord)
@@ -67,13 +68,10 @@ public final class JQOffsetPagination
     Objects.requireNonNull(sort, "sort");
     Objects.requireNonNull(fromRecord, "fromRecord");
 
-    final var sortArray = new Field[sort.size()];
-    sort.toArray(sortArray);
-
     return paginate(
       context,
       query,
-      sortArray,
+      sort,
       limit,
       offset,
       fromRecord,
@@ -102,7 +100,51 @@ public final class JQOffsetPagination
   public static <T> JQPage<T> paginate(
     final DSLContext context,
     final Select<?> query,
-    final Field<?>[] sort,
+    final List<JQField> sort,
+    final long limit,
+    final long offset,
+    final Function<Record, T> fromRecord,
+    final Consumer<Statement> statementListener)
+  {
+    Objects.requireNonNull(context, "context");
+    Objects.requireNonNull(query, "query");
+    Objects.requireNonNull(sort, "sort");
+    Objects.requireNonNull(fromRecord, "fromRecord");
+
+    final var sortArray = new JQField[sort.size()];
+    sort.toArray(sortArray);
+
+    return paginate(
+      context,
+      query,
+      sortArray,
+      limit,
+      offset,
+      fromRecord,
+      statementListener
+    );
+  }
+
+  /**
+   * Paginate a query using offset pagination.
+   *
+   * @param context           The DSL context
+   * @param query             The base query
+   * @param sort              The fields by which the query is to be sorted
+   * @param limit             The limit (page size)
+   * @param offset            The starting offset
+   * @param fromRecord        A function that converts records to values
+   * @param <T>               The type of returned values
+   * @param statementListener A listener that will receive the statement to be
+   *                          executed
+   *
+   * @return A page of results
+   */
+
+  public static <T> JQPage<T> paginate(
+    final DSLContext context,
+    final Select<?> query,
+    final JQField[] sort,
     final long limit,
     final long offset,
     final Function<Record, T> fromRecord,
@@ -158,26 +200,33 @@ public final class JQOffsetPagination
   private static Select<?> paginateInner(
     final DSLContext context,
     final Select<?> query,
-    final Field<?>[] sort,
+    final JQField[] sort,
     final long limit,
     final long offset)
   {
     final var u =
       query.asTable("jq_inner");
 
+    final var uOrderByFields = new SortField<?>[sort.length];
+    for (int index = 0; index < sort.length; ++index) {
+      uOrderByFields[index] = sort[index].fieldQualifiedSort(u);
+    }
+
     final var pageItemsTotal =
       DSL.count().over()
         .as("jq_page_items_total");
 
     final var pageItemIndex =
-      DSL.rowNumber().over().orderBy(u.fields(sort))
+      DSL.rowNumber()
+        .over()
+        .orderBy(uOrderByFields)
         .as("jq_page_item_index");
 
     final var t =
       context.select(u.asterisk())
         .select(pageItemsTotal, pageItemIndex)
         .from(u)
-        .orderBy(u.fields(sort))
+        .orderBy(uOrderByFields)
         .limit(Long.valueOf(limit))
         .offset(Long.valueOf(offset));
 
@@ -196,6 +245,11 @@ public final class JQOffsetPagination
         .plus(DSL.inline(1))
         .as("jq_page_index_current");
 
+    final var tOrderByFields = new SortField<?>[sort.length];
+    for (int index = 0; index < sort.length; ++index) {
+      tOrderByFields[index] = sort[index].fieldQualifiedSort(t.asTable());
+    }
+
     return context.select(t.fields(query.getSelect().toArray(Field[]::new)))
       .select(
         pageSize,
@@ -204,6 +258,6 @@ public final class JQOffsetPagination
         t.field(pageItemIndex),
         pageIndexCurrent)
       .from(t)
-      .orderBy(t.fields(sort));
+      .orderBy(tOrderByFields);
   }
 }

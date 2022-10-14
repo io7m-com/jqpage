@@ -16,9 +16,15 @@
 
 package com.io7m.jqpage.core;
 
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.GroupField;
+import org.jooq.Record;
+import org.jooq.SelectConditionStep;
+import org.jooq.SortField;
 import org.jooq.Statement;
+import org.jooq.Table;
 import org.jooq.TableLike;
 import org.jooq.impl.DSL;
 
@@ -41,10 +47,12 @@ public final class JQKeysetRandomAccessPagination
   /**
    * Create a set of pages for the given query.
    *
-   * @param context    The SQL context
-   * @param table      The table-like query
-   * @param sortFields The ORDER BY fields
-   * @param pageSize   The page size
+   * @param context           The SQL context
+   * @param table             The table-like query
+   * @param sortFields        The ORDER BY fields
+   * @param pageSize          The page size
+   * @param groupBy           The group by fields, if grouping is to be used
+   * @param whereConditions   The conditions by which to filter rows
    *
    * @return A set of pages
    */
@@ -52,13 +60,17 @@ public final class JQKeysetRandomAccessPagination
   public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
     final DSLContext context,
     final TableLike<?> table,
-    final List<Field<?>> sortFields,
+    final List<JQField> sortFields,
+    final List<Condition> whereConditions,
+    final List<GroupField> groupBy,
     final long pageSize)
   {
     return createPageDefinitions(
       context,
       table,
       sortFields,
+      whereConditions,
+      groupBy,
       pageSize,
       statement -> {
 
@@ -75,6 +87,8 @@ public final class JQKeysetRandomAccessPagination
    * @param pageSize          The page size
    * @param statementListener A listener that will receive the statement to be
    *                          executed
+   * @param groupBy           The group by fields, if grouping is to be used
+   * @param whereConditions   The conditions by which to filter rows
    *
    * @return A set of pages
    */
@@ -82,13 +96,16 @@ public final class JQKeysetRandomAccessPagination
   public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
     final DSLContext context,
     final TableLike<?> table,
-    final List<Field<?>> sortFields,
+    final List<JQField> sortFields,
+    final List<Condition> whereConditions,
+    final List<GroupField> groupBy,
     final long pageSize,
     final Consumer<Statement> statementListener)
   {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(table, "table");
-    Objects.requireNonNull(sortFields, "fields");
+    Objects.requireNonNull(sortFields, "sortFields");
+    Objects.requireNonNull(whereConditions, "whereConditions");
     Objects.requireNonNull(statementListener, "statementListener");
 
     /*
@@ -97,9 +114,14 @@ public final class JQKeysetRandomAccessPagination
      * database side with a window function.
      */
 
+    final SortField<?>[] fieldsForOrderBy =
+      buildFieldsForInnerOrderBy(sortFields);
+    final Field<?>[] fieldsForSelect =
+      buildFieldsForInnerSelect(sortFields);
+
     final var pageBoundaryExpression =
       DSL.rowNumber()
-        .over(DSL.orderBy(sortFields))
+        .over(DSL.orderBy(fieldsForOrderBy))
         .modulo(DSL.inline(pageSize));
 
     final var casePageBoundary =
@@ -108,19 +130,23 @@ public final class JQKeysetRandomAccessPagination
         .else_(DSL.inline(false))
         .as("jq_is_page_boundary");
 
-    final var innerSelects = new ArrayList<>(sortFields);
+    final var innerSelects = new ArrayList<Field<?>>();
+    for (final var f : fieldsForSelect) {
+      innerSelects.add(f);
+    }
     innerSelects.add(casePageBoundary);
 
-    final var innerPageBoundaries =
+    final var innerPageBaseQuery =
       context.select(innerSelects)
         .from(table)
-        .orderBy(sortFields)
-        .asTable("jq_inner");
+        .where(whereConditions);
 
-    final ArrayList<Field<?>> innerFields = new ArrayList<>();
-    for (final var field : sortFields) {
-      innerFields.add(innerPageBoundaries.field(field));
-    }
+    final Table<?> innerPageBoundaries =
+      applyGroupByIfNecessary(groupBy, fieldsForOrderBy, innerPageBaseQuery);
+    final SortField<?>[] fieldsForOrderByInner =
+      buildQualifiedFieldsForInnerOrderBy(sortFields, innerPageBoundaries);
+    final Field<?>[] fieldsForSelectInner =
+      buildQualifiedFieldsForInnerSelect(sortFields, innerPageBoundaries);
 
     /*
      * Use a window function to calculate page numbers. Select records
@@ -129,11 +155,14 @@ public final class JQKeysetRandomAccessPagination
 
     final var pageNumberExpression =
       DSL.rowNumber()
-        .over(DSL.orderBy(innerFields))
+        .over(DSL.orderBy(fieldsForOrderByInner))
         .plus(DSL.inline(1))
         .as("jq_page_number");
 
-    final ArrayList<Field<?>> outerSelects = new ArrayList<>(innerFields);
+    final ArrayList<Field<?>> outerSelects = new ArrayList<>();
+    for (final var f : fieldsForSelectInner) {
+      outerSelects.add(f);
+    }
     outerSelects.add(pageNumberExpression);
 
     final var outerPageBoundaries =
@@ -149,14 +178,14 @@ public final class JQKeysetRandomAccessPagination
     final var result =
       outerPageBoundaries.fetch();
 
-    final var orderBy = new Field<?>[sortFields.size()];
-    sortFields.toArray(orderBy);
-
     var firstOffset = 0L;
     pages.add(
       new JQKeysetRandomAccessPageDefinition(
         new Object[0],
-        orderBy,
+        table,
+        fieldsForOrderBy,
+        whereConditions,
+        groupBy,
         1L,
         pageSize,
         firstOffset)
@@ -164,14 +193,17 @@ public final class JQKeysetRandomAccessPagination
 
     for (final var record : result) {
       firstOffset += pageSize;
-      final var values = new Object[sortFields.size()];
+      final var values = new Object[fieldsForOrderBy.length];
       for (int index = 0; index < values.length; ++index) {
-        values[index] = record.get(sortFields.get(index));
+        values[index] = record.get(fieldsForSelect[index]);
       }
       pages.add(
         new JQKeysetRandomAccessPageDefinition(
           values,
-          orderBy,
+          table,
+          fieldsForOrderBy,
+          whereConditions,
+          groupBy,
           record.<Long>getValue("jq_page_number", Long.class).longValue(),
           pageSize,
           firstOffset
@@ -179,5 +211,68 @@ public final class JQKeysetRandomAccessPagination
       );
     }
     return pages;
+  }
+
+  private static Field<?>[] buildQualifiedFieldsForInnerSelect(
+    final List<JQField> sortFields,
+    final Table<?> innerPageBoundaries)
+  {
+    final var fieldsForSelectInner = new Field[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForSelectInner[index] =
+        sortFields.get(index).fieldQualified(innerPageBoundaries);
+    }
+    return fieldsForSelectInner;
+  }
+
+  private static SortField<?>[] buildQualifiedFieldsForInnerOrderBy(
+    final List<JQField> sortFields,
+    final Table<?> innerPageBoundaries)
+  {
+    final var fieldsForOrderByInner = new SortField[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForOrderByInner[index] =
+        sortFields.get(index).fieldQualifiedSort(innerPageBoundaries);
+    }
+    return fieldsForOrderByInner;
+  }
+
+  private static Table<?> applyGroupByIfNecessary(
+    final List<GroupField> groupBy,
+    final SortField<?>[] fieldsForOrderBy,
+    final SelectConditionStep<Record> innerPageBaseQuery)
+  {
+    final Table<?> innerPageBoundaries;
+    if (!groupBy.isEmpty()) {
+      innerPageBoundaries =
+        innerPageBaseQuery.groupBy(groupBy)
+          .orderBy(fieldsForOrderBy)
+          .asTable("jq_inner");
+    } else {
+      innerPageBoundaries =
+        innerPageBaseQuery.orderBy(fieldsForOrderBy)
+          .asTable("jq_inner");
+    }
+    return innerPageBoundaries;
+  }
+
+  private static Field<?>[] buildFieldsForInnerSelect(
+    final List<JQField> sortFields)
+  {
+    final var fieldsForSelect = new Field[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForSelect[index] = sortFields.get(index).field();
+    }
+    return fieldsForSelect;
+  }
+
+  private static SortField<?>[] buildFieldsForInnerOrderBy(
+    final List<JQField> sortFields)
+  {
+    final var fieldsForOrderBy = new SortField[sortFields.size()];
+    for (int index = 0; index < sortFields.size(); ++index) {
+      fieldsForOrderBy[index] = sortFields.get(index).fieldOrdered();
+    }
+    return fieldsForOrderBy;
   }
 }

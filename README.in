@@ -71,9 +71,20 @@ final JQPage<Person> page =
 ### Keyset Pagination
 
 Keyset pagination is provided by the `JQKeysetRandomAccessPagination` class.
-The `JQKeysetRandomAccessPagination.createPageDefinitions()` function takes
-a _table expression_, a list of fields for the `ORDER BY` clause, and
-the desired page size. The method returns a list of
+
+The `JQKeysetRandomAccessPagination.createPageDefinitions()` function has
+the following parameters:
+
+|Name| Description                                                                                                                                              |
+|----|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+|context| The `jooq` DSL context used to execute queries.                                                                                                          |
+|table| A _table_ expression. Typically the name of a table, or a set of table joins. All columns referenced elsewhere must be present in this table expression. |
+|sortFields|The list of fields by which to sort the resulting rows|
+|whereConditions|The list of conditions by which to filter rows. An empty list means no `WHERE` clause.|
+|groupBy|A list of fields to use in a `GROUP BY` clause. An empty list means no `GROUP BY`.|
+|pageSize|The maximum desired size of a page.|
+
+The method returns a list of
 `JQKeysetRandomAccessPageDefinition` structures that individually contain
 all the information required to seek directly to any page of the executed
 query in more or less constant time. The `JQKeysetRandomAccessPagination`
@@ -93,19 +104,36 @@ Person toCustomer(
   );
 }
 
+final List<JQField> orderBy =
+  List.of(
+    new JQField(CUSTOMER.FIRST_NAME, ASCENDING),
+    new JQField(CUSTOMER.LAST_NAME, DESCENDING),
+  );
+
 final List<JQKeysetRandomAccessPageDefinition> pages =
   JQKeysetRandomAccessPagination.createPageDefinitions(
     context,
-    CUSTOMER.where(CUSTOMER.FIRST_NAME.like("%%I%%")),
-    List.of(CUSTOMER.FIRST_NAME, CUSTOMER.LAST_NAME),
+    CUSTOMER,
+    List.of(
+      CUSTOMER.FIRST_NAME.like("%I%")
+    )
+    List.of(),
+    orderBy,
     75L
   );
   
 final JQKeysetRandomAccessPageDefinition page = pages.get(1);
 
 final List<Person> records =
+  page.query(context)
+    .fetch()
+    .map(this::toCustomer);
+
+// Or, equivalently:
+
+final List<Person> records =
   context.selectFrom(CUSTOMER)
-    .where(CUSTOMER.FIRST_NAME.like("%%I%%"))
+    .where(CUSTOMER.FIRST_NAME.like("%I%"))
     .orderBy(page.orderBy())
     .seek(page.seek())
     .limit(page.limit())
