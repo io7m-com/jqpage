@@ -27,9 +27,9 @@
 
   <properties>
     <io7m.api.previousVersion>0.0.1-SNAPSHOT</io7m.api.previousVersion>
-    <jooq.version>3.18.3</jooq.version>
+    <jooq.version>3.18.4</jooq.version>
     <junit.version>5.9.3</junit.version>
-    <testcontainers.version>1.18.0</testcontainers.version>
+    <testcontainers.version>1.18.1</testcontainers.version>
   </properties>
 
   <licenses>
