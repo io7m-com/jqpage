@@ -33,6 +33,10 @@ import java.util.function.Consumer;
 
 public final class JQKeysetRandomAccessPaginationParameters
 {
+  private static final Consumer<Statement> DO_NOTHING = statement -> {
+    // Ignore the statement.
+  };
+
   private final TableLike<?> table;
   private final List<JQField> sortFields;
   private final List<Condition> whereConditions;
@@ -156,8 +160,7 @@ public final class JQKeysetRandomAccessPaginationParameters
     private List<Condition> whereConditions = new ArrayList<>();
     private List<GroupField> groupBy = new ArrayList<>();
     private long pageSize;
-    private Consumer<Statement> statementListener = s -> {
-    };
+    private Consumer<Statement> statementListener = DO_NOTHING;
     private JQSelectDistinct distinct = JQSelectDistinct.SELECT;
 
     private Builder(
