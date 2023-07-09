@@ -46,6 +46,7 @@ import java.util.Objects;
  * @param index       The page number (starting at 1)
  * @param limit       The maximum possible number of items in the page
  * @param firstOffset The offset of the first item
+ * @param distinct    Whether SELECT DISTINCT needs to be used
  */
 
 public record JQKeysetRandomAccessPageDefinition(
@@ -56,7 +57,8 @@ public record JQKeysetRandomAccessPageDefinition(
   List<GroupField> groupBy,
   long index,
   long limit,
-  long firstOffset)
+  long firstOffset,
+  JQSelectDistinct distinct)
 {
   /**
    * A page produced by keyset pagination. The {@link #seek} field specifies a
@@ -73,12 +75,18 @@ public record JQKeysetRandomAccessPageDefinition(
    * @param index       The page number (starting at 1)
    * @param limit       The maximum possible number of items in the page
    * @param firstOffset The offset of the first item
+   * @param distinct    Whether SELECT DISTINCT needs to be used
    */
 
   public JQKeysetRandomAccessPageDefinition
   {
     Objects.requireNonNull(seek, "seek");
     Objects.requireNonNull(orderBy, "orderBy");
+    Objects.requireNonNull(table, "table");
+    Objects.requireNonNull(orderBy, "orderBy");
+    Objects.requireNonNull(conditions, "conditions");
+    Objects.requireNonNull(groupBy, "groupBy");
+    Objects.requireNonNull(distinct, "distinct");
   }
 
   /**
@@ -106,9 +114,9 @@ public record JQKeysetRandomAccessPageDefinition(
   {
     final SelectSelectStep<Record> baseStart;
     if (fields.isEmpty()) {
-      baseStart = context.select();
+      baseStart = doSelect(context, List.of(), this.distinct);
     } else {
-      baseStart = context.select(fields);
+      baseStart = doSelect(context, fields, this.distinct);
     }
 
     final SelectConditionStep<?> baseSelect =
@@ -133,5 +141,16 @@ public record JQKeysetRandomAccessPageDefinition(
       return baseOrderedSelect
         .limit(Long.valueOf(this.limit));
     }
+  }
+
+  private static SelectSelectStep<Record> doSelect(
+    final DSLContext context,
+    final List<Field<?>> fields,
+    final JQSelectDistinct distinct)
+  {
+    return switch (distinct) {
+      case SELECT -> context.select(fields);
+      case SELECT_DISTINCT -> context.selectDistinct(fields);
+    };
   }
 }

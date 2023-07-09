@@ -16,22 +16,20 @@
 
 package com.io7m.jqpage.core;
 
-import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.GroupField;
 import org.jooq.Record;
 import org.jooq.SelectConditionStep;
+import org.jooq.SelectSelectStep;
 import org.jooq.SortField;
-import org.jooq.Statement;
 import org.jooq.Table;
-import org.jooq.TableLike;
 import org.jooq.impl.DSL;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
 
 /**
  * Pagination functions using keyset pagination.
@@ -47,66 +45,18 @@ public final class JQKeysetRandomAccessPagination
   /**
    * Create a set of pages for the given query.
    *
-   * @param context           The SQL context
-   * @param table             The table-like query
-   * @param sortFields        The ORDER BY fields
-   * @param pageSize          The page size
-   * @param groupBy           The group by fields, if grouping is to be used
-   * @param whereConditions   The conditions by which to filter rows
+   * @param context    The SQL context
+   * @param parameters The parameters
    *
    * @return A set of pages
    */
 
   public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
     final DSLContext context,
-    final TableLike<?> table,
-    final List<JQField> sortFields,
-    final List<Condition> whereConditions,
-    final List<GroupField> groupBy,
-    final long pageSize)
-  {
-    return createPageDefinitions(
-      context,
-      table,
-      sortFields,
-      whereConditions,
-      groupBy,
-      pageSize,
-      statement -> {
-
-      }
-    );
-  }
-
-  /**
-   * Create a set of pages for the given query.
-   *
-   * @param context           The SQL context
-   * @param table             The table-like query
-   * @param sortFields        The ORDER BY fields
-   * @param pageSize          The page size
-   * @param statementListener A listener that will receive the statement to be
-   *                          executed
-   * @param groupBy           The group by fields, if grouping is to be used
-   * @param whereConditions   The conditions by which to filter rows
-   *
-   * @return A set of pages
-   */
-
-  public static List<JQKeysetRandomAccessPageDefinition> createPageDefinitions(
-    final DSLContext context,
-    final TableLike<?> table,
-    final List<JQField> sortFields,
-    final List<Condition> whereConditions,
-    final List<GroupField> groupBy,
-    final long pageSize,
-    final Consumer<Statement> statementListener)
+    final JQKeysetRandomAccessPaginationParameters parameters)
   {
     Objects.requireNonNull(context, "context");
-    Objects.requireNonNull(table, "table");
-    Objects.requireNonNull(sortFields, "sortFields");
-    Objects.requireNonNull(whereConditions, "whereConditions");
-    Objects.requireNonNull(statementListener, "statementListener");
+    Objects.requireNonNull(parameters, "parameters");
 
     /*
      * An object is on a page boundary if the row number is exactly
@@ -114,11 +64,15 @@ public final class JQKeysetRandomAccessPagination
      * database side with a window function.
      */
 
+    final var sortFields =
+      parameters.sortFields();
     final SortField<?>[] fieldsForOrderBy =
       buildFieldsForInnerOrderBy(sortFields);
     final Field<?>[] fieldsForSelect =
       buildFieldsForInnerSelect(sortFields);
 
+    final var pageSize =
+      parameters.pageSize();
     final var pageBoundaryExpression =
       DSL.rowNumber()
         .over(DSL.orderBy(fieldsForOrderBy))
@@ -130,14 +84,19 @@ public final class JQKeysetRandomAccessPagination
         .else_(DSL.inline(false))
         .as("jq_is_page_boundary");
 
-    final var innerSelects = new ArrayList<Field<?>>();
-    for (final var f : fieldsForSelect) {
-      innerSelects.add(f);
-    }
+    final var innerSelects =
+      new ArrayList<>(Arrays.asList(fieldsForSelect));
     innerSelects.add(casePageBoundary);
 
+    final var table =
+      parameters.table();
+    final var whereConditions =
+      parameters.whereConditions();
+    final var groupBy =
+      parameters.groupBy();
+
     final var innerPageBaseQuery =
-      context.select(innerSelects)
+      doSelect(innerSelects, parameters.distinct())
         .from(table)
         .where(whereConditions);
 
@@ -159,21 +118,23 @@ public final class JQKeysetRandomAccessPagination
         .plus(DSL.inline(1))
         .as("jq_page_number");
 
-    final ArrayList<Field<?>> outerSelects = new ArrayList<>();
-    for (final var f : fieldsForSelectInner) {
-      outerSelects.add(f);
-    }
+    final ArrayList<Field<?>> outerSelects =
+      new ArrayList<>(Arrays.asList(fieldsForSelectInner));
     outerSelects.add(pageNumberExpression);
+
+    final var isPageBoundary =
+      DSL.condition(innerPageBoundaries.field("jq_is_page_boundary").isTrue());
 
     final var outerPageBoundaries =
       context.select(outerSelects)
         .from(innerPageBoundaries)
-        .where(DSL.condition(innerPageBoundaries.field("jq_is_page_boundary").isTrue()));
+        .where(isPageBoundary);
 
     final var pages =
       new ArrayList<JQKeysetRandomAccessPageDefinition>();
 
-    statementListener.accept(outerPageBoundaries);
+    parameters.statementListener()
+      .accept(outerPageBoundaries);
 
     final var result =
       outerPageBoundaries.fetch();
@@ -188,7 +149,9 @@ public final class JQKeysetRandomAccessPagination
         groupBy,
         1L,
         pageSize,
-        firstOffset)
+        firstOffset,
+        parameters.distinct()
+      )
     );
 
     for (final var record : result) {
@@ -206,11 +169,22 @@ public final class JQKeysetRandomAccessPagination
           groupBy,
           record.<Long>getValue("jq_page_number", Long.class).longValue(),
           pageSize,
-          firstOffset
+          firstOffset,
+          parameters.distinct()
         )
       );
     }
     return pages;
+  }
+
+  private static SelectSelectStep<Record> doSelect(
+    final ArrayList<Field<?>> innerSelects,
+    final JQSelectDistinct distinct)
+  {
+    return switch (distinct) {
+      case SELECT -> DSL.select(innerSelects);
+      case SELECT_DISTINCT -> DSL.selectDistinct(innerSelects);
+    };
   }
 
   private static Field<?>[] buildQualifiedFieldsForInnerSelect(

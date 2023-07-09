@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.io7m.primogenitor</groupId>
     <artifactId>com.io7m.primogenitor.full</artifactId>
-    <version>7.5.0</version>
+    <version>8.0.0-beta0001</version>
   </parent>
 
   <groupId>com.io7m.jqpage</groupId>
@@ -26,10 +26,12 @@
   </modules>
 
   <properties>
+    <com.io7m.ervilla.version>0.0.4</com.io7m.ervilla.version>
     <io7m.api.previousVersion>0.0.1-SNAPSHOT</io7m.api.previousVersion>
     <jooq.version>3.18.4</jooq.version>
     <junit.version>5.9.3</junit.version>
-    <testcontainers.version>1.18.1</testcontainers.version>
+
+    <containers.postgresql.version>15.2</containers.postgresql.version>
   </properties>
 
   <licenses>
@@ -87,16 +89,6 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>org.osgi</groupId>
-        <artifactId>org.osgi.annotation.bundle</artifactId>
-        <version>2.0.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.osgi</groupId>
-        <artifactId>org.osgi.annotation.versioning</artifactId>
-        <version>1.1.2</version>
-      </dependency>
-      <dependency>
         <groupId>org.jooq</groupId>
         <artifactId>jooq</artifactId>
         <version>${jooq.version}</version>
@@ -105,26 +97,6 @@
         <groupId>org.jooq</groupId>
         <artifactId>jooq-postgres-extensions</artifactId>
         <version>${jooq.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-engine</artifactId>
-        <version>${junit.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>junit-jupiter</artifactId>
-        <version>${testcontainers.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>postgresql</artifactId>
-        <version>${testcontainers.version}</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -141,12 +113,67 @@
         <artifactId>postgresql</artifactId>
         <version>42.6.0</version>
       </dependency>
+
+      <!-- Build metadata. -->
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.annotation.bundle</artifactId>
+        <version>2.0.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.osgi</groupId>
+        <artifactId>org.osgi.annotation.versioning</artifactId>
+        <version>1.1.2</version>
+      </dependency>
+
+      <!-- Test suite. -->
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-engine</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.io7m.ervilla</groupId>
+        <artifactId>com.io7m.ervilla.test_extension</artifactId>
+        <version>${com.io7m.ervilla.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.io7m.ervilla</groupId>
+        <artifactId>com.io7m.ervilla.api</artifactId>
+        <version>${com.io7m.ervilla.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.io7m.ervilla</groupId>
+        <artifactId>com.io7m.ervilla.native_exec</artifactId>
+        <version>${com.io7m.ervilla.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.io7m.ervilla</groupId>
+        <artifactId>com.io7m.ervilla.postgres</artifactId>
+        <version>${com.io7m.ervilla.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.io7m.zelador</groupId>
+        <artifactId>com.io7m.zelador.test_extension</artifactId>
+        <version>${com.io7m.zelador.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>com.io7m.stmp</groupId>
+          <artifactId>string-template-maven-plugin</artifactId>
+          <version>1.2.0</version>
+        </plugin>
+
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-checkstyle-plugin</artifactId>
