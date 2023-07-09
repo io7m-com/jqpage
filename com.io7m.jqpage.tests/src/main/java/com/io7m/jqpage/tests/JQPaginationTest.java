@@ -16,20 +16,35 @@
 
 package com.io7m.jqpage.tests;
 
+import com.io7m.ervilla.api.EContainerSupervisorType;
+import com.io7m.ervilla.test_extension.ErvillaCloseAfterAll;
+import com.io7m.ervilla.test_extension.ErvillaConfiguration;
+import com.io7m.ervilla.test_extension.ErvillaExtension;
 import com.io7m.jqpage.core.JQField;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPageDefinition;
 import com.io7m.jqpage.core.JQKeysetRandomAccessPagination;
+import com.io7m.jqpage.core.JQKeysetRandomAccessPaginationParameters;
 import com.io7m.jqpage.core.JQOffsetPagination;
+import com.io7m.jqpage.core.JQSelectDistinct;
+import com.io7m.jqpage.tests.JQTestContainers.JQDatabaseFixture;
+import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.Record;
+import org.jooq.conf.RenderNameCase;
+import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static com.io7m.jqpage.core.JQOrder.ASCENDING;
 import static com.io7m.jqpage.core.JQOrder.DESCENDING;
@@ -37,19 +52,48 @@ import static com.io7m.jqpage.tests.Tables.FILM;
 import static com.io7m.jqpage.tests.Tables.FILM_ACTOR;
 import static com.io7m.jqpage.tests.tables.Actor.ACTOR;
 import static com.io7m.jqpage.tests.tables.Customer.CUSTOMER;
+import static org.jooq.SQLDialect.POSTGRES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@Testcontainers(disabledWithoutDocker = true)
+@ExtendWith({ErvillaExtension.class})
+@ErvillaConfiguration(disabledIfUnsupported = true)
 public final class JQPaginationTest
-  extends JQWithDatabaseContract
 {
-  private ArrayList<String> statements;
+  private static JQDatabaseFixture DATABASE_FIXTURE;
+
+  @BeforeAll
+  public static void setupOnce(
+    final @ErvillaCloseAfterAll EContainerSupervisorType containers)
+    throws Exception
+  {
+    DATABASE_FIXTURE =
+      JQTestContainers.createDatabase(containers, 35432);
+  }
 
   @BeforeEach
   public void setup()
+    throws Exception
   {
+    DATABASE_FIXTURE.reset();
+
     this.statements = new ArrayList<String>();
   }
+
+  private static Connection openConnection()
+    throws SQLException
+  {
+    return DATABASE_FIXTURE.openConnection();
+  }
+
+  private static DSLContext createContext(
+    final Connection connection)
+  {
+    final var settings =
+      new Settings().withRenderNameCase(RenderNameCase.LOWER);
+    return DSL.using(connection, POSTGRES, settings);
+  }
+
+  private ArrayList<String> statements;
 
   @AfterEach
   public void tearDown()
@@ -248,21 +292,17 @@ public final class JQPaginationTest
       final var context =
         createContext(connection);
 
+      final var parameters =
+        JQKeysetRandomAccessPaginationParameters.forTable(CUSTOMER)
+          .addSortField(new JQField(CUSTOMER.FIRST_NAME, ASCENDING))
+          .addSortField(new JQField(CUSTOMER.LAST_NAME, ASCENDING))
+          .addWhereCondition(CUSTOMER.FIRST_NAME.like("%%I%%"))
+          .setPageSize(75L)
+          .setStatementListener(s -> this.statements.add(s.toString()))
+          .build();
+
       final List<JQKeysetRandomAccessPageDefinition> pages =
-        JQKeysetRandomAccessPagination.createPageDefinitions(
-          context,
-          CUSTOMER,
-          List.of(
-            new JQField(CUSTOMER.FIRST_NAME, ASCENDING),
-            new JQField(CUSTOMER.LAST_NAME, ASCENDING)
-          ),
-          List.of(
-            CUSTOMER.FIRST_NAME.like("%%I%%")
-          ),
-          List.of(),
-          75L,
-          statement -> this.statements.add(statement.toString())
-        );
+        JQKeysetRandomAccessPagination.createPageDefinitions(context, parameters);
 
       assertEquals(4, pages.size());
 
@@ -345,20 +385,18 @@ public final class JQPaginationTest
       final var context =
         createContext(connection);
 
+      final var parameters =
+        JQKeysetRandomAccessPaginationParameters.forTable(CUSTOMER)
+          .addSortField(new JQField(CUSTOMER.FIRST_NAME, DESCENDING))
+          .addSortField(new JQField(CUSTOMER.LAST_NAME, DESCENDING))
+          .addWhereCondition(CUSTOMER.FIRST_NAME.like("%%I%%"))
+          .setPageSize(75L)
+          .setStatementListener(s -> this.statements.add(s.toString()))
+          .build();
+
       final List<JQKeysetRandomAccessPageDefinition> pages =
         JQKeysetRandomAccessPagination.createPageDefinitions(
-          context,
-          CUSTOMER,
-          List.of(
-            new JQField(CUSTOMER.FIRST_NAME, DESCENDING),
-            new JQField(CUSTOMER.LAST_NAME, DESCENDING)
-          ),
-          List.of(
-            CUSTOMER.FIRST_NAME.like("%%I%%")
-          ),
-          List.of(),
-          75L
-        );
+          context, parameters);
 
       assertEquals(4, pages.size());
 
@@ -443,17 +481,15 @@ public final class JQPaginationTest
       final var context =
         createContext(connection);
 
+      final var parameters =
+        JQKeysetRandomAccessPaginationParameters.forTable(CUSTOMER)
+          .addSortField(new JQField(CUSTOMER.CUSTOMER_ID, DESCENDING))
+          .setPageSize(75L)
+          .setStatementListener(s -> this.statements.add(s.toString()))
+          .build();
+
       final List<JQKeysetRandomAccessPageDefinition> pages =
-        JQKeysetRandomAccessPagination.createPageDefinitions(
-          context,
-          CUSTOMER,
-          List.of(
-            new JQField(CUSTOMER.CUSTOMER_ID, DESCENDING)
-          ),
-          List.of(),
-          List.of(),
-          75L
-        );
+        JQKeysetRandomAccessPagination.createPageDefinitions(context, parameters);
 
       assertEquals(8, pages.size());
 
@@ -587,15 +623,18 @@ public final class JQPaginationTest
           .join(FILM_ACTOR).on(FILM_ACTOR.ACTOR_ID.eq(ACTOR.ACTOR_ID))
           .join(FILM).on(FILM.FILM_ID.eq(FILM_ACTOR.FILM_ID));
 
+      final var parameters =
+        JQKeysetRandomAccessPaginationParameters.forTable(baseTable)
+          .addSortField(new JQField(ACTOR.ACTOR_ID, ASCENDING))
+          .addWhereCondition(FILM.TITLE.equalIgnoreCase("MIRACLE VIRTUAL"))
+          .addGroupByField(ACTOR.ACTOR_ID)
+          .addGroupByField(FILM.FILM_ID)
+          .setPageSize(75L)
+          .setStatementListener(s -> this.statements.add(s.toString()))
+          .build();
+
       final List<JQKeysetRandomAccessPageDefinition> pages =
-        JQKeysetRandomAccessPagination.createPageDefinitions(
-          context,
-          baseTable,
-          List.of(new JQField(ACTOR.ACTOR_ID, ASCENDING)),
-          List.of(FILM.TITLE.equalIgnoreCase("MIRACLE VIRTUAL")),
-          List.of(ACTOR.ACTOR_ID, FILM.FILM_ID),
-          75L
-        );
+        JQKeysetRandomAccessPagination.createPageDefinitions(context, parameters);
 
       assertEquals(1, pages.size());
 
@@ -613,6 +652,87 @@ public final class JQPaginationTest
         assertEquals("COSTNER", records.get(0).nameLast);
       }
     }
+  }
+
+  /**
+   * Select actors using keyset pagination with DISTINCT.
+   *
+   * @throws Exception On errors
+   */
+
+  @Test
+  public void testActorKeysetPaginationDistinct()
+    throws Exception
+  {
+    try (var connection = openConnection()) {
+      final var context =
+        createContext(connection);
+
+      final var baseTable =
+        ACTOR.leftJoin(FILM_ACTOR).using(ACTOR.ACTOR_ID);
+
+      final var parameters =
+        JQKeysetRandomAccessPaginationParameters.forTable(baseTable)
+          .addSortField(new JQField(ACTOR.FIRST_NAME, ASCENDING))
+          .addSortField(new JQField(ACTOR.LAST_NAME, ASCENDING))
+          .setDistinct(JQSelectDistinct.SELECT_DISTINCT)
+          .setPageSize(100L)
+          .setStatementListener(s -> this.statements.add(s.toString()))
+          .build();
+
+      final List<JQKeysetRandomAccessPageDefinition> pages =
+        JQKeysetRandomAccessPagination.createPageDefinitions(context, parameters);
+
+      assertEquals(55L, pages.size());
+
+      {
+        final var page = pages.get(0);
+        assertEquals(1L, page.index());
+
+        final List<Person> records =
+          page.queryFields(context, List.of(ACTOR.ACTOR_ID, ACTOR.FIRST_NAME, ACTOR.LAST_NAME))
+            .fetch()
+            .map(JQPaginationTest::toActor);
+
+        assertEquals("ADAM", records.get(0).nameFirst);
+        assertEquals("GRANT", records.get(0).nameLast);
+
+        assertEquals("ADAM", records.get(1).nameFirst);
+        assertEquals("HOPPER", records.get(1).nameLast);
+      }
+
+      checkEveryActorIsPresent(context, pages);
+    }
+  }
+
+  private static void checkEveryActorIsPresent(
+    final DSLContext context,
+    final List<JQKeysetRandomAccessPageDefinition> pages)
+  {
+    final var allPeople =
+      context.select(ACTOR.ACTOR_ID, ACTOR.FIRST_NAME, ACTOR.LAST_NAME)
+        .from(ACTOR)
+        .fetch()
+        .stream()
+        .map(JQPaginationTest::toActor)
+        .collect(Collectors.toUnmodifiableSet());
+
+    final var pagesPeople =
+      new HashSet<Person>();
+
+    final List<Field<?>> fields =
+      List.of(ACTOR.ACTOR_ID, ACTOR.FIRST_NAME, ACTOR.LAST_NAME);
+
+    for (final var page : pages) {
+      final List<Person> records =
+        page.queryFields(context, fields)
+          .fetch()
+          .map(JQPaginationTest::toActor);
+
+      pagesPeople.addAll(records);
+    }
+
+    assertEquals(allPeople, pagesPeople);
   }
 
   private static Person toCustomer(

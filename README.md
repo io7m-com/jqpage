@@ -7,11 +7,13 @@ jqpage
 
 ![jqpage](./src/site/resources/jqpage.jpg?raw=true)
 
-| JVM             | Platform | Status |
-|-----------------|----------|--------|
-| OpenJDK LTS     | Linux    | [![Build (OpenJDK LTS, Linux)](https://img.shields.io/github/workflow/status/io7m/jqpage/main-openjdk_lts-linux)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain-openjdk_lts-linux) |
-| OpenJDK Current | Linux    | [![Build (OpenJDK Current, Linux)](https://img.shields.io/github/workflow/status/io7m/jqpage/main-openjdk_current-linux)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain-openjdk_current-linux)
-| OpenJDK Current | Windows  | [![Build (OpenJDK Current, Windows)](https://img.shields.io/github/workflow/status/io7m/jqpage/main-openjdk_current-windows)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain-openjdk_current-windows)
+| JVM | Platform | Status |
+|-----|----------|--------|
+| OpenJDK (Temurin) Current | Linux | [![Build (OpenJDK (Temurin) Current, Linux)](https://img.shields.io/github/actions/workflow/status/io7m/jqpage/main.linux.temurin.current.yml)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain.linux.temurin.current)|
+| OpenJDK (Temurin) LTS | Linux | [![Build (OpenJDK (Temurin) LTS, Linux)](https://img.shields.io/github/actions/workflow/status/io7m/jqpage/main.linux.temurin.lts.yml)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain.linux.temurin.lts)|
+| OpenJDK (Temurin) Current | Windows | [![Build (OpenJDK (Temurin) Current, Windows)](https://img.shields.io/github/actions/workflow/status/io7m/jqpage/main.windows.temurin.current.yml)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain.windows.temurin.current)|
+| OpenJDK (Temurin) LTS | Windows | [![Build (OpenJDK (Temurin) LTS, Windows)](https://img.shields.io/github/actions/workflow/status/io7m/jqpage/main.windows.temurin.lts.yml)](https://github.com/io7m/jqpage/actions?query=workflow%3Amain.windows.temurin.lts)|
+
 
 ## Usage
 
@@ -87,8 +89,10 @@ final JQPage<Person> page =
 
 Keyset pagination is provided by the `JQKeysetRandomAccessPagination` class.
 
-The `JQKeysetRandomAccessPagination.createPageDefinitions()` function has
-the following parameters:
+The `JQKeysetRandomAccessPagination.createPageDefinitions()` function takes
+an instance of the immutable `JQKeysetRandomAccessPaginationParameters` class.
+The `JQKeysetRandomAccessPaginationParameters` class has the following
+properties:
 
 |Name| Description                                                                                                                                              |
 |----|----------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -98,6 +102,11 @@ the following parameters:
 |whereConditions|The list of conditions by which to filter rows. An empty list means no `WHERE` clause.|
 |groupBy|A list of fields to use in a `GROUP BY` clause. An empty list means no `GROUP BY`.|
 |pageSize|The maximum desired size of a page.|
+|distinct|Whether to use SELECT DISTINCT for the processed rows.|
+
+Due to the large number of parameters, the
+`JQKeysetRandomAccessPaginationParameters` class provides a mutable builder
+for constructing instances of the class.
 
 The method returns a list of
 `JQKeysetRandomAccessPageDefinition` structures that individually contain
@@ -125,17 +134,16 @@ final List<JQField> orderBy =
     new JQField(CUSTOMER.LAST_NAME, DESCENDING),
   );
 
+final JQKeysetRandomAccessPaginationParameters parameters =
+  JQKeysetRandomAccessPaginationParameters.forTable(CUSTOMER)
+    .addWhereCondition(CUSTOMER.FIRST_NAME.like("%I%"))
+    .addSortField(new JQField(CUSTOMER.FIRST_NAME, ASCENDING))
+    .addSortField(new JQField(CUSTOMER.LAST_NAME, DESCENDING))
+    .setPageSize(75L)
+    .build();
+
 final List<JQKeysetRandomAccessPageDefinition> pages =
-  JQKeysetRandomAccessPagination.createPageDefinitions(
-    context,
-    CUSTOMER,
-    List.of(
-      CUSTOMER.FIRST_NAME.like("%I%")
-    )
-    List.of(),
-    orderBy,
-    75L
-  );
+  JQKeysetRandomAccessPagination.createPageDefinitions(context, parameters);
   
 final JQKeysetRandomAccessPageDefinition page = pages.get(1);
 
