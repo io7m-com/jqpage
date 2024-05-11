@@ -31,7 +31,7 @@
     <io7m.java.targetJavaVersion>21</io7m.java.targetJavaVersion>
 
     <!-- io7m dependencies. -->
-    <com.io7m.ervilla.version>1.0.0-beta0002</com.io7m.ervilla.version>
+    <com.io7m.ervilla.version>1.0.0</com.io7m.ervilla.version>
 
     <!-- Third-party dependencies. -->
     <jooq.version>3.19.8</jooq.version>
