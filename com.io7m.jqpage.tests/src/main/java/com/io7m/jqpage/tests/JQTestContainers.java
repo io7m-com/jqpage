@@ -19,6 +19,7 @@ package com.io7m.jqpage.tests;
 
 import com.io7m.ervilla.api.EContainerSupervisorType;
 import com.io7m.ervilla.api.EContainerType;
+import com.io7m.ervilla.api.EPortAddressType;
 import com.io7m.ervilla.postgres.EPgSpecs;
 
 import java.io.IOException;
@@ -152,7 +153,7 @@ public final class JQTestContainers
       supervisor.start(
         EPgSpecs.builderFromDockerIO(
           JQTestProperties.POSTGRESQL_VERSION,
-          Optional.empty(),
+          new EPortAddressType.All(),
           port,
           "postgres",
           "postgres",
