@@ -9,7 +9,7 @@
   <parent>
     <artifactId>com.io7m.jqpage</artifactId>
     <groupId>com.io7m.jqpage</groupId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
   </parent>
 
   <artifactId>com.io7m.jqpage.tests</artifactId>
