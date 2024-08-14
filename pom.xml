@@ -34,7 +34,7 @@
     <com.io7m.ervilla.version>1.0.0</com.io7m.ervilla.version>
 
     <!-- Third-party dependencies. -->
-    <jooq.version>3.19.10</jooq.version>
+    <jooq.version>3.19.11</jooq.version>
     <junit.version>5.10.3</junit.version>
     <containers.postgresql.version>15.2</containers.postgresql.version>
   </properties>
