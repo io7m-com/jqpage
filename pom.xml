@@ -35,7 +35,7 @@
 
     <!-- Third-party dependencies. -->
     <jooq.version>3.19.14</jooq.version>
-    <org.junit.version>5.11.2</org.junit.version>
+    <org.junit.version>5.11.3</org.junit.version>
     <containers.postgresql.version>15.2</containers.postgresql.version>
   </properties>
 
